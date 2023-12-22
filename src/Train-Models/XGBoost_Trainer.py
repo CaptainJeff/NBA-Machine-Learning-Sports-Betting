@@ -1,4 +1,6 @@
+import os
 import sqlite3
+import sys
 import numpy as np
 import pandas as pd
 import xgboost as xgb
@@ -6,10 +8,12 @@ from sklearn.metrics import accuracy_score
 from sklearn.model_selection import train_test_split
 from tqdm import tqdm
 
+from src.Configs.Model_Config import XGBOOST_CONFIG
+
 # Constants
-DATABASE_PATH = "../../Data/dataset.sqlite"
+DATABASE_PATH = "./Data/dataset.sqlite"
 DATASET = "dataset_2012-24"
-MODEL_SAVE_PATH = '../../Models/XGBoost_{}%_UO-9.json'
+MODEL_SAVE_PATH = './Models/XGBoost_{}%_UO-9.json'
 
 # Configuration for XGBoost
 XGB_PARAMS = {
@@ -32,20 +36,22 @@ def load_data(dataset):
     return data
 
 
-def preprocess_data(data):
+def preprocess_data(data, config):
     """Preprocess the data for model training."""
-    OU = data['OU-Cover']
-    total = data['OU']
-    data.drop(['Score', 'Home-Team-Win', 'TEAM_NAME', 'Date',
-              'TEAM_NAME.1', 'Date.1', 'OU-Cover', 'OU'], axis=1, inplace=True)
-    data['OU'] = np.asarray(total)
+    OU = data[config["target_column"]]
+
+    if 'filter_as_array_column' in config:
+        data[config['filter_as_array_column']] = np.asarray(
+            data[config['filter_as_array_column']])
+
+    data.drop(config["drop_columns"], axis=1, inplace=True)
     return data.values.astype(float), OU
 
 
 def train_and_evaluate(data, labels):
     """Train the model and evaluate its performance."""
     acc_results = []
-    for _ in tqdm(range(100)):
+    for _ in tqdm(range(2)):
         x_train, x_test, y_train, y_test = train_test_split(
             data, labels, test_size=.1)
         train = xgb.DMatrix(x_train, label=y_train)
@@ -65,5 +71,5 @@ def train_and_evaluate(data, labels):
 
 # Main execution
 data = load_data(DATASET)
-processed_data, labels = preprocess_data(data)
+processed_data, labels = preprocess_data(data, XGBOOST_CONFIG["ou_model"])
 train_and_evaluate(processed_data, labels)
